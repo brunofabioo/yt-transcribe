@@ -1,5 +1,5 @@
 # YouTube Video Transcriber API
-# Dependências para produção na Vercel
+# Dependências para produção (Vercel + Render)
 
 # FastAPI e servidor
 fastapi>=0.104.0
