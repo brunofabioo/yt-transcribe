@@ -1,0 +1,17 @@
+# YouTube Video Transcriber API
+# Dependências para produção na Vercel
+
+# FastAPI e servidor
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Essenciais
+yt-dlp>=2023.12.30
+youtube-transcript-api>=0.6.0
+openai>=1.0.0
+openai-whisper>=20231117
+
+# Utilitários
+requests>=2.28.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
