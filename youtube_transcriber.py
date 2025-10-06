@@ -17,6 +17,8 @@ import re
 import subprocess
 from typing import Optional, Dict, Any
 import requests
+import time
+import random
 
 # Importação compatível com diferentes versões do OpenAI
 try:
@@ -99,30 +101,91 @@ class YouTubeTranscriber:
     
     def download_video(self, url: str, output_path: str = "temp_video.mp4") -> str:
         """
-        Baixa o vídeo do YouTube.
-        
-        Args:
-            url: URL do vídeo
-            output_path: Caminho para salvar o vídeo
-            
-        Returns:
-            Caminho do vídeo baixado
+        Baixa o vídeo do YouTube usando estratégias anti-bot.
+        Tenta em ordem crescente de agressividade.
         """
         print("📥 Baixando vídeo do YouTube...")
-        
+
+        strategies = [
+            self._dl_basic,
+            self._dl_with_headers,
+            self._dl_with_browser_cookies,
+            self._dl_with_retries,
+        ]
+
+        last_error: Optional[Exception] = None
+        for idx, strategy in enumerate(strategies, start=1):
+            try:
+                print(f"🔄 Estratégia {idx}/{len(strategies)}...")
+                strategy(url, output_path)
+                print("✅ Vídeo baixado com sucesso!")
+                return output_path
+            except Exception as err:
+                last_error = err
+                print(f"⚠️ Falhou estratégia {idx}: {err}")
+                if idx < len(strategies):
+                    time.sleep(1.5)
+                continue
+
+        raise Exception(f"Erro ao baixar vídeo: {last_error}")
+
+    def _common_headers(self) -> Dict[str, str]:
+        return {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,pt-BR;q=0.8',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+
+    def _dl_basic(self, url: str, output_path: str) -> None:
         ydl_opts = {
             'outtmpl': output_path,
             'format': 'best[height<=720]',
             'quiet': True,
         }
-        
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-            print("✅ Vídeo baixado com sucesso!")
-            return output_path
-        except Exception as e:
-            raise Exception(f"Erro ao baixar vídeo: {e}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+    def _dl_with_headers(self, url: str, output_path: str) -> None:
+        ydl_opts = {
+            'outtmpl': output_path,
+            'format': 'best[height<=720]',
+            'quiet': True,
+            'http_headers': self._common_headers(),
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+    def _dl_with_browser_cookies(self, url: str, output_path: str) -> None:
+        """Tenta usar cookies do navegador local (Chrome/Edge/Firefox)."""
+        ydl_opts = {
+            'outtmpl': output_path,
+            'format': 'best[height<=720]',
+            'quiet': True,
+            'http_headers': self._common_headers(),
+            # Tenta diferentes navegadores automaticamente
+            'cookiesfrombrowser': ('chrome', 'edge', 'firefox'),
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+    def _dl_with_retries(self, url: str, output_path: str) -> None:
+        ydl_opts = {
+            'outtmpl': output_path,
+            'format': 'best[height<=720]',
+            'quiet': True,
+            'http_headers': self._common_headers(),
+            'retries': 5,
+            'fragment_retries': 5,
+            'extractor_retries': 5,
+            'throttledratelimit': 1024 * 512,  # 512KB/s para evitar throttling agressivo
+        }
+        # Pequeno atraso aleatório para disfarçar padrão
+        time.sleep(random.uniform(1.0, 2.5))
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
     
     def extract_audio_ffmpeg(self, video_path: str, audio_path: str) -> None:
         """
